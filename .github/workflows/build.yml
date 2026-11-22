@@ -16,143 +16,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - name: Create project files
-        run: |
-          mkdir -p app/src/main/kotlin/app/unrepost app/src/main/assets
-          cat > settings.gradle.kts <<'EOF_UR'
-          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-          dependencyResolutionManagement { repositories { google(); mavenCentral() } }
-          rootProject.name = "UnRepost"
-          include(":app")
-          EOF_UR
-          cat > build.gradle.kts <<'EOF_UR'
-          plugins {
-              id("com.android.application") version "8.5.2" apply false
-              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
-          }
-          EOF_UR
-          cat > app/build.gradle.kts <<'EOF_UR'
-          plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
-          android {
-              namespace = "app.unrepost"
-              compileSdk = 34
-              defaultConfig { applicationId = "app.unrepost"; minSdk = 26; targetSdk = 34; versionCode = 1; versionName = "1.0" }
-              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-              kotlinOptions { jvmTarget = "17" }
-          }
-          EOF_UR
-          cat > app/src/main/AndroidManifest.xml <<'EOF_UR'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET"/>
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-              <uses-permission android:name="android.permission.WAKE_LOCK"/>
-              <application android:label="UnRepost" android:allowBackup="false"
-                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
-                  <activity android:name=".MainActivity" android:exported="true"
-                      android:configChanges="orientation|screenSize|keyboardHidden">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-                  <service android:name=".KeepAliveService" android:exported="false"
-                      android:foregroundServiceType="dataSync"/>
-              </application>
-          </manifest>
-          EOF_UR
-          cat > app/src/main/kotlin/app/unrepost/KeepAliveService.kt <<'EOF_UR'
-          package app.unrepost
-
-          import android.app.*
-          import android.content.*
-          import android.content.pm.ServiceInfo
-          import android.os.*
-
-          /** Держит процесс живым в фоне: уведомление + wake lock. Сама работа идёт в WebView. */
-          class KeepAliveService : Service() {
-              private var wl: PowerManager.WakeLock? = null
-              override fun onBind(i: Intent?): IBinder? = null
-
-              override fun onStartCommand(i: Intent?, f: Int, id: Int): Int {
-                  val n = note(this, "Удаляю репосты…")
-                  if (Build.VERSION.SDK_INT >= 29) startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-                  else startForeground(1, n)
-                  if (wl == null) wl = getSystemService(PowerManager::class.java)
-                      .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "unrepost:run").apply { acquire(8 * 3600_000L) }
-                  return START_NOT_STICKY
-              }
-
-              override fun onDestroy() { wl?.release(); super.onDestroy() }
-
-              companion object {
-                  fun note(c: Context, text: String): Notification {
-                      c.getSystemService(NotificationManager::class.java)
-                          .createNotificationChannel(NotificationChannel("ur", "UnRepost", NotificationManager.IMPORTANCE_LOW))
-                      val pi = PendingIntent.getActivity(c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-                      return Notification.Builder(c, "ur").setContentTitle("UnRepost").setContentText(text)
-                          .setSmallIcon(android.R.drawable.stat_notify_sync).setContentIntent(pi).setOngoing(true).build()
-                  }
-              }
-          }
-          EOF_UR
-          cat > app/src/main/kotlin/app/unrepost/MainActivity.kt <<'EOF_UR'
-          package app.unrepost
-
-          import android.Manifest
-          import android.annotation.SuppressLint
-          import android.app.Activity
-          import android.app.NotificationManager
-          import android.content.Intent
-          import android.graphics.Color
-          import android.graphics.drawable.GradientDrawable
-          import android.os.Build
-          import android.os.Bundle
-          import android.view.Gravity
-          import android.view.View
-          import android.view.WindowManager
-          import android.webkit.*
-          import android.widget.*
-          import org.json.JSONObject
-
-          class MainActivity : Activity() {
-              private lateinit var web: WebView
-              private lateinit var num: TextView
-              private lateinit var info: TextView
-              private lateinit var btn: Button
-              private var st = "idle"
-              private val engine by lazy { assets.open("engine.js").bufferedReader().readText() }
-
-              @SuppressLint("SetJavaScriptEnabled")
-              override fun onCreate(b: Bundle?) {
-                  super.onCreate(b)
-                  if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
-                  val d = resources.displayMetrics.density
-                  val dp = { v: Int -> (v * d).toInt() }
-
-                  web = WebView(this)
-                  web.settings.apply {
-                      javaScriptEnabled = true; domStorageEnabled = true
-                      useWideViewPort = true; loadWithOverviewMode = true
-                      setSupportZoom(true); builtInZoomControls = true; displayZoomControls = false
-                      // десктопная версия TikTok: в ней есть вкладка «Репосты»
-                      userAgentString = WebSettings.getDefaultUserAgent(this@MainActivity)
-                          .replace(Regex("\\(Linux; Android[^)]*\\)"), "(X11; Linux x86_64)").replace(" Mobile", "")
-                  }
-                  CookieManager.getInstance().apply { setAcceptCookie(true); setAcceptThirdPartyCookies(web, true) }
-                  web.addJavascriptInterface(Bridge(), "Android")
-                  web.webViewClient = object : WebViewClient() {
-                      override fun onPageFinished(v: WebView, u: String) {
-                          if (u.contains("tiktok.com")) v.evaluateJavascript(engine, null)
-                      }
-                  }
-
-                  num = TextView(this).apply { textSize = 44f; setTextColor(Color.WHITE); gravity = Gravity.CENTER }
-                  info = TextView(this).apply { textSize = 14f; setTextColor(0xFFA0A0A0.toInt()); gravity = Gravity.CENTER }
-                  btn = Button(this).apply {
-                      isAllCaps = false; setTextColor(Color.WHITE); textSize = 16f
-                      background = GradientDrawable().apply { setColor(0xFFFE2C55.toInt()); cornerRadius = dp(26).toFloat() }
-                      setOnClickListener { onBtn() }
-                  }
-                  val panel = LinearLayout
+      - name: Unpack project
+        run: unzip -q ./*.zip -d src
+      - name: Build APK
+        working-directory: src/UnRepost
+        run: gradle assembleDebug --no-daemon
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: UnRepost build ${{ github.run_number }}
+          files: src/UnRepost/app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UnRepost-apk
+          path: src/UnRepost/app/build/outputs/apk/debug/app-debug.apk
