@@ -16,17 +16,709 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - name: Unpack project
-        run: unzip -q ./*.zip -d src
+      - name: Create project files
+        run: |
+          mkdir -p app/src/main/kotlin/app/unrepost app/src/main/assets app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26
+          cat > settings.gradle.kts <<'EOF_UR'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositories { google(); mavenCentral() } }
+          rootProject.name = "UnRepost"
+          include(":app")
+          EOF_UR
+          cat > build.gradle.kts <<'EOF_UR'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          EOF_UR
+          cat > app/build.gradle.kts <<'EOF_UR'
+          plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
+          android {
+              namespace = "app.unrepost"
+              compileSdk = 34
+              signingConfigs {
+                  getByName("debug") {
+                      storeFile = file("debug.keystore")
+                      storePassword = "unrepost"; keyAlias = "unrepost"; keyPassword = "unrepost"; storeType = "pkcs12"
+                  }
+              }
+              defaultConfig { applicationId = "app.unrepost"; minSdk = 26; targetSdk = 34; versionCode = 4; versionName = "1.3" }
+              buildTypes {
+                  release {
+                      signingConfig = signingConfigs.getByName("debug")
+                      isMinifyEnabled = false
+                  }
+              }
+              lint { checkReleaseBuilds = false; abortOnError = false }
+              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          EOF_UR
+          cat > app/debug.keystore.b64 <<'EOF_UR'
+          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
+          EOF_UR
+          cat > app/src/main/AndroidManifest.xml <<'EOF_UR'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.WAKE_LOCK"/>
+              <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+              <application android:label="UnRepost" android:allowBackup="false"
+                  android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+                  <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <service android:name=".KeepAliveService" android:exported="false"
+                      android:foregroundServiceType="dataSync"/>
+              </application>
+          </manifest>
+          EOF_UR
+          cat > app/src/main/res/drawable/ic_launcher_background.xml <<'EOF_UR'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#FF2E7E" android:pathData="M0,0h108v108h-108z"/>
+          </vector>
+          EOF_UR
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml <<'EOF_UR'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+              <group android:rotation="90" android:pivotX="54" android:pivotY="54">
+                  <path android:strokeColor="#FFE3EE" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round"
+                      android:pathData="M36,52 V44 A6,6 0 0 1 42,38 H68 M62,31.5 L68.5,38 L62,44.5 M72,56 V64 A6,6 0 0 1 66,70 H40 M46,63.5 L39.5,70 L46,76.5"/>
+                  <path android:strokeColor="#FF2E7E" android:strokeWidth="13" android:strokeLineCap="round" android:pathData="M31,31 L77,77"/>
+                  <path android:strokeColor="#FFFFFF" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M31,31 L77,77"/>
+              </group>
+          </vector>
+          EOF_UR
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'EOF_UR'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@drawable/ic_launcher_background"/>
+              <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+          </adaptive-icon>
+          EOF_UR
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml <<'EOF_UR'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@drawable/ic_launcher_background"/>
+              <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+          </adaptive-icon>
+          EOF_UR
+          cat > app/src/main/kotlin/app/unrepost/KeepAliveService.kt <<'EOF_UR'
+          package app.unrepost
+
+          import android.app.*
+          import android.content.*
+          import android.content.pm.ServiceInfo
+          import android.os.*
+
+          /** Держит процесс живым в фоне: уведомление + wake lock. Сама работа идёт в WebView. */
+          class KeepAliveService : Service() {
+              private var wl: PowerManager.WakeLock? = null
+              override fun onBind(i: Intent?): IBinder? = null
+
+              override fun onStartCommand(i: Intent?, f: Int, id: Int): Int {
+                  val n = note(this, "Удаляю репосты…")
+                  if (Build.VERSION.SDK_INT >= 29) startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                  else startForeground(1, n)
+                  if (wl == null) wl = getSystemService(PowerManager::class.java)
+                      .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "unrepost:run").apply { acquire(8 * 3600_000L) }
+                  return START_NOT_STICKY
+              }
+
+              override fun onDestroy() { wl?.release(); super.onDestroy() }
+
+              companion object {
+                  @Volatile private var chan = false
+
+                  private fun channels(c: Context) {
+                      if (chan) return
+                      val nm = c.getSystemService(NotificationManager::class.java)
+                      nm.createNotificationChannel(NotificationChannel("ur", "UnRepost", NotificationManager.IMPORTANCE_LOW))
+                      nm.createNotificationChannel(NotificationChannel("ur_done", "UnRepost: готово", NotificationManager.IMPORTANCE_DEFAULT))
+                      chan = true
+                  }
+
+                  private fun pending(c: Context): PendingIntent =
+                      PendingIntent.getActivity(c, 0, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+
+                  fun note(c: Context, text: String): Notification {
+                      channels(c)
+                      return Notification.Builder(c, "ur").setContentTitle("UnRepost").setContentText(text)
+                          .setSmallIcon(android.R.drawable.stat_notify_sync).setContentIntent(pending(c)).setOngoing(true).build()
+                  }
+
+                  fun summary(c: Context, text: String): Notification {
+                      channels(c)
+                      return Notification.Builder(c, "ur_done").setContentTitle("UnRepost").setContentText(text)
+                          .setSmallIcon(android.R.drawable.stat_notify_sync).setContentIntent(pending(c)).setAutoCancel(true).build()
+                  }
+              }
+          }
+          EOF_UR
+          cat > app/src/main/kotlin/app/unrepost/MainActivity.kt <<'EOF_UR'
+          package app.unrepost
+
+          import android.Manifest
+          import android.annotation.SuppressLint
+          import android.app.Activity
+          import android.app.NotificationManager
+          import android.content.Context
+          import android.content.Intent
+          import android.content.MutableContextWrapper
+          import android.content.res.ColorStateList
+          import android.graphics.Color
+          import android.graphics.Typeface
+          import android.graphics.drawable.Drawable
+          import android.graphics.drawable.GradientDrawable
+          import android.graphics.drawable.RippleDrawable
+          import android.net.Uri
+          import android.os.Build
+          import android.os.Bundle
+          import android.os.Handler
+          import android.os.Looper
+          import android.os.PowerManager
+          import android.os.SystemClock
+          import android.provider.Settings
+          import android.view.Gravity
+          import android.view.View
+          import android.view.ViewGroup
+          import android.view.ViewOutlineProvider
+          import android.webkit.*
+          import android.widget.*
+          import org.json.JSONObject
+
+          /** Один WebView на весь процесс: переживает закрытие экрана и работает в фоне. */
+          object Hub {
+              var web: WebView? = null
+              var desktop = false
+              var st = "init"; var n = 0; var sk = 0; var msg = ""; var user = ""
+              var ui: (() -> Unit)? = null
+              val handler = Handler(Looper.getMainLooper())
+              lateinit var app: Context
+              private var lastNote = 0L
+              private val engineJs: String by lazy { app.assets.open("engine.js").bufferedReader().use { it.readText() } }
+
+              fun ua(ctx: Context): String {
+                  val d = WebSettings.getDefaultUserAgent(ctx)
+                  return if (desktop)
+                      d.replace(Regex("\\(Linux; Android[^)]*\\)"), "(X11; Linux x86_64)").replace(" Mobile", "").replace("Version/4.0 ", "")
+                  else d.replace("; wv", "").replace("Version/4.0 ", "")
+              }
+
+              @SuppressLint("SetJavaScriptEnabled")
+              fun create(ctx: Context): WebView {
+                  app = ctx.applicationContext
+                  val w = WebView(MutableContextWrapper(app))
+                  w.settings.apply {
+                      javaScriptEnabled = true; domStorageEnabled = true
+                      useWideViewPort = true; loadWithOverviewMode = true
+                      setSupportZoom(true); builtInZoomControls = true; displayZoomControls = false
+                      mediaPlaybackRequiresUserGesture = true
+                      setSupportMultipleWindows(false)
+                      allowFileAccess = false; allowContentAccess = false
+                      userAgentString = ua(app)
+                  }
+                  CookieManager.getInstance().apply { setAcceptCookie(true); setAcceptThirdPartyCookies(w, true) }
+                  w.addJavascriptInterface(Bridge(), "Android")
+                  w.webViewClient = object : WebViewClient() {
+                      override fun onPageFinished(v: WebView, u: String) {
+                          if (u.contains("tiktok.com")) v.evaluateJavascript(engineJs, null)
+                      }
+                  }
+                  w.loadUrl("https://www.tiktok.com/login")
+                  web = w
+                  return w
+              }
+
+              fun onState(s: String, count: Int, skipped: Int, text: String, who: String) {
+                  if (s == st && count == n && skipped == sk && text == msg && who == user) return
+                  val wasBusy = st == "running" || st == "paused"
+                  st = s; n = count; sk = skipped; msg = text
+                  if (who.isNotEmpty()) user = who
+                  val nm = app.getSystemService(NotificationManager::class.java)
+                  if (s == "running") {
+                      val now = SystemClock.elapsedRealtime()
+                      if (now - lastNote > 2000) { lastNote = now; nm.notify(1, KeepAliveService.note(app, "Удалено: $count")) }
+                  } else if (wasBusy && s != "paused") {
+                      app.stopService(Intent(app, KeepAliveService::class.java))
+                      if (s == "done" || s == "error")
+                          nm.notify(2, KeepAliveService.summary(app, if (s == "done") "Готово. Удалено: $count, не удалось: $skipped" else text))
+                  }
+                  ui?.invoke()
+              }
+          }
+
+          class Bridge {
+              @JavascriptInterface
+              fun post(j: String) {
+                  Hub.handler.post {
+                      try {
+                          val o = JSONObject(j)
+                          Hub.onState(o.getString("s"), o.optInt("removed"), o.optInt("skipped"), o.optString("msg"), o.optString("u"))
+                      } catch (e: Exception) { }
+                  }
+              }
+
+              /** Пауза движка считается здесь, а не в JS: JS-таймеры в фоне замедляются. */
+              @JavascriptInterface
+              fun sleep(ms: Long, id: Int) {
+                  Hub.handler.postDelayed({ Hub.web?.evaluateJavascript("window.__UR&&__UR._wake($id)", null) }, ms)
+              }
+          }
+
+          class MainActivity : Activity() {
+              private val BG = 0xFF0E0E10.toInt()
+              private val CARD = 0xFF1A1A1F.toInt()
+              private val PINK = 0xFFFE2C55.toInt()
+              private val SUB = 0xFF9A9AA6.toInt()
+              private val LINE = 0xFF3A3A44.toInt()
+
+              private lateinit var web: WebView
+              private lateinit var homeBox: ScrollView
+              private lateinit var webBox: LinearLayout
+              private lateinit var runBox: LinearLayout
+              private lateinit var avatar: TextView
+              private lateinit var userTv: TextView
+              private lateinit var stateTv: TextView
+              private lateinit var infoTv: TextView
+              private lateinit var primary: Button
+              private lateinit var secondary: Button
+              private lateinit var webHint: TextView
+              private lateinit var viewMode: TextView
+              private lateinit var spin: ProgressBar
+              private lateinit var num2: TextView
+              private lateinit var info2: TextView
+              private lateinit var btn2: Button
+              private var showWeb = false
+              private var loginFlow = false
+              private var busy = false
+
+              private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+              private fun shape(color: Int, radius: Int): GradientDrawable =
+                  GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
+
+              private fun ripple(base: Drawable): Drawable = RippleDrawable(ColorStateList.valueOf(0x33FFFFFF), base, null)
+
+              private fun label(t: String, sp: Float, color: Int, bold: Boolean = false, center: Boolean = false): TextView =
+                  TextView(this).apply {
+                      text = t; textSize = sp; setTextColor(color)
+                      if (bold) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                      if (center) gravity = Gravity.CENTER
+                  }
+
+              private fun filled(): Button = Button(this).apply {
+                  isAllCaps = false; setTextColor(Color.WHITE); textSize = 16f
+                  typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                  background = ripple(shape(PINK, 28)); stateListAnimator = null
+              }
+
+              private fun outlined(): Button = Button(this).apply {
+                  isAllCaps = false; setTextColor(Color.WHITE); textSize = 15f
+                  background = ripple(GradientDrawable().apply { setColor(Color.TRANSPARENT); setStroke(dp(1), LINE); cornerRadius = dp(28).toFloat() })
+                  stateListAnimator = null
+              }
+
+              private fun lp(w: Int, h: Int, top: Int = 0): LinearLayout.LayoutParams =
+                  LinearLayout.LayoutParams(w, h).apply { topMargin = dp(top) }
+
+              override fun onCreate(b: Bundle?) {
+                  super.onCreate(b)
+                  if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+                  window.statusBarColor = BG
+                  window.navigationBarColor = BG
+
+                  web = Hub.web ?: Hub.create(this)
+                  (web.parent as? ViewGroup)?.removeView(web)
+                  (web.context as? MutableContextWrapper)?.baseContext = this
+
+                  // ---------- главный экран ----------
+                  val logo = FrameLayout(this).apply {
+                      background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(PINK) }
+                      outlineProvider = ViewOutlineProvider.BACKGROUND
+                      clipToOutline = true
+                      addView(ImageView(this@MainActivity).apply { setImageResource(R.drawable.ic_launcher_foreground) },
+                          FrameLayout.LayoutParams(dp(150), dp(150), Gravity.CENTER))
+                  }
+                  avatar = label("T", 18f, Color.WHITE, bold = true, center = true).apply {
+                      background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(PINK) }
+                  }
+                  userTv = label("Аккаунт TikTok", 16f, Color.WHITE, bold = true)
+                  stateTv = label("", 13f, SUB)
+                  infoTv = label("", 13f, SUB).apply { setLineSpacing(0f, 1.15f) }
+                  val who = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; addView(userTv); addView(stateTv) }
+                  val head = LinearLayout(this).apply {
+                      orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                      addView(avatar, LinearLayout.LayoutParams(dp(44), dp(44)))
+                      addView(who, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(12) })
+                  }
+                  val card = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL; background = shape(CARD, 20); setPadding(dp(18), dp(18), dp(18), dp(18))
+                      addView(head); addView(infoTv, lp(-1, -2, 14))
+                  }
+                  primary = filled().apply { setOnClickListener { onPrimary() } }
+                  secondary = outlined().apply { setOnClickListener { showWeb = true; loginFlow = false; render() } }
+                  val content = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(28), dp(22), dp(24))
+                      addView(logo, LinearLayout.LayoutParams(dp(96), dp(96)).apply { gravity = Gravity.CENTER_HORIZONTAL })
+                      addView(label("UnRepost", 28f, Color.WHITE, bold = true, center = true), lp(-1, -2, 16))
+                      addView(label("Удалите все репосты TikTok за один раз", 14f, SUB, center = true), lp(-1, -2, 6))
+                      addView(card, lp(-1, -2, 28))
+                      addView(primary, lp(-1, dp(56), 22))
+                      addView(secondary, lp(-1, dp(52), 12))
+                      addView(label("Удаление идёт в фоне: можно свернуть приложение или выключить экран.", 12f, SUB, center = true), lp(-1, -2, 22))
+                  }
+                  homeBox = ScrollView(this).apply { setBackgroundColor(BG); isFillViewport = true; addView(content) }
+
+                  // ---------- экран TikTok (вход и удаление по одному) ----------
+                  val back = label("‹  Назад", 15f, Color.WHITE, bold = true).apply {
+                      setPadding(dp(16), dp(14), dp(12), dp(14))
+                      setOnClickListener { showWeb = false; loginFlow = false; render() }
+                  }
+                  webHint = label("", 11f, SUB)
+                  val titleBox = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      addView(label("TikTok", 15f, Color.WHITE, bold = true)); addView(webHint)
+                  }
+                  viewMode = label("", 12f, SUB).apply { setPadding(dp(12), dp(14), dp(16), dp(14)); setOnClickListener { toggleView() } }
+                  val bar = LinearLayout(this).apply {
+                      orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setBackgroundColor(BG)
+                      addView(back); addView(titleBox, LinearLayout.LayoutParams(0, -2, 1f)); addView(viewMode)
+                  }
+                  webBox = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      addView(bar); addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
+                  }
+
+                  // ---------- экран работы: тяжёлый сайт скрыт, телефон не тормозит ----------
+                  spin = ProgressBar(this).apply { isIndeterminate = true; indeterminateTintList = ColorStateList.valueOf(PINK) }
+                  num2 = label("0", 72f, Color.WHITE, bold = true, center = true)
+                  info2 = label("", 15f, SUB, center = true).apply { setPadding(dp(28), dp(4), dp(28), dp(4)) }
+                  btn2 = filled().apply { setOnClickListener { onRunToggle() } }
+                  val stopBtn = outlined().apply {
+                      text = "Остановить"
+                      setOnClickListener { web.evaluateJavascript("window.__UR&&__UR.stop()", null) }
+                  }
+                  runBox = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setBackgroundColor(BG)
+                      setPadding(dp(32), dp(24), dp(32), dp(24))
+                      addView(spin, LinearLayout.LayoutParams(dp(48), dp(48)))
+                      addView(num2, lp(-2, -2, 12))
+                      addView(label("репостов удалено", 14f, SUB, center = true))
+                      addView(info2, lp(-1, -2, 14))
+                      addView(btn2, lp(dp(240), dp(54), 28))
+                      addView(stopBtn, lp(dp(240), dp(48), 12))
+                      addView(label("Можно свернуть приложение или выключить экран: удаление продолжится в фоне.", 12f, SUB, center = true), lp(-1, -2, 28))
+                  }
+
+                  setContentView(FrameLayout(this).apply {
+                      setBackgroundColor(BG)
+                      addView(webBox, FrameLayout.LayoutParams(-1, -1))
+                      addView(homeBox, FrameLayout.LayoutParams(-1, -1))
+                      addView(runBox, FrameLayout.LayoutParams(-1, -1))
+                  })
+                  Hub.ui = { render() }
+                  render()
+              }
+
+              private fun toggleView() {
+                  Hub.desktop = !Hub.desktop
+                  Hub.web?.let { w -> w.settings.userAgentString = Hub.ua(this); w.reload() }
+                  render()
+              }
+
+              private fun startRun() {
+                  val pm = getSystemService(PowerManager::class.java)
+                  if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                      try {
+                          startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+                      } catch (e: Exception) { }
+                  }
+                  startForegroundService(Intent(this, KeepAliveService::class.java))
+                  web.evaluateJavascript("window.__UR&&__UR.start()", null)
+              }
+
+              private fun onPrimary() {
+                  when (Hub.st) {
+                      "ready" -> startRun()
+                      "done" -> { Hub.st = "init"; Hub.web?.reload(); render() }
+                      "error" -> { loginFlow = true; showWeb = true; web.loadUrl("https://www.tiktok.com/login"); render() }
+                      else -> { loginFlow = true; showWeb = true; render() }
+                  }
+              }
+
+              private fun onRunToggle() {
+                  web.evaluateJavascript(if (Hub.st == "paused") "window.__UR&&__UR.resume()" else "window.__UR&&__UR.pause()", null)
+              }
+
+              private fun render() {
+                  val s = Hub.st
+                  busy = s == "running" || s == "paused"
+                  if (showWeb && loginFlow && s == "ready") { showWeb = false; loginFlow = false }
+                  homeBox.visibility = if (!busy && !showWeb) View.VISIBLE else View.GONE
+                  runBox.visibility = if (busy) View.VISIBLE else View.GONE
+                  webBox.visibility = if (busy) View.GONE else if (showWeb) View.VISIBLE else View.INVISIBLE
+
+                  // главный экран
+                  avatar.text = if (Hub.user.isEmpty()) "T" else Hub.user.substring(0, 1).uppercase()
+                  userTv.text = if (Hub.user.isEmpty()) "Аккаунт TikTok" else "@" + Hub.user
+                  secondary.text = "Открыть TikTok"
+                  secondary.visibility = if (s == "init") View.GONE else View.VISIBLE
+                  when (s) {
+                      "ready" -> {
+                          stateTv.text = "Вход выполнен"
+                          infoTv.text = if (Hub.n > 0) "Удалено в этой сессии: ${Hub.n}" else "Всё готово. Нажмите кнопку ниже, и я удалю все ваши репосты."
+                          primary.text = "Удалить все репосты"
+                      }
+                      "done" -> {
+                          stateTv.text = "Готово ✓"
+                          infoTv.text = "Удалено: ${Hub.n}. Не удалось удалить: ${Hub.sk}."
+                          primary.text = "Проверить ещё раз"
+                      }
+                      "error" -> {
+                          stateTv.text = "Ошибка"
+                          infoTv.text = Hub.msg.ifEmpty { "Что-то пошло не так." }
+                          primary.text = "Войти заново"
+                      }
+                      "init" -> {
+                          stateTv.text = "Проверяю вход…"
+                          infoTv.text = "Это займёт несколько секунд."
+                          primary.text = "Открыть TikTok"
+                      }
+                      else -> {
+                          stateTv.text = "Нужен вход"
+                          infoTv.text = Hub.msg.ifEmpty { "Войдите в TikTok. Если вы уже вошли, откройте профиль → «Репосты»." }
+                          primary.text = "Войти в TikTok"
+                      }
+                  }
+
+                  // экран TikTok
+                  webHint.text = when (s) {
+                      "ready" -> "Откройте репост и нажмите «Удалить репост»"
+                      "idle", "init" -> "Войдите. Если «Слишком много попыток» — подождите или войдите по SMS / QR (ПК-вид)"
+                      else -> ""
+                  }
+                  viewMode.text = if (Hub.desktop) "Телефонный вид" else "ПК-вид"
+
+                  // экран работы
+                  num2.text = Hub.n.toString()
+                  info2.text = if (s == "paused") "На паузе" else Hub.msg.ifEmpty { "Удаляю репосты…" }
+                  btn2.text = if (s == "paused") "Продолжить" else "Пауза"
+                  spin.visibility = if (s == "running") View.VISIBLE else View.INVISIBLE
+              }
+
+              override fun onStart() { super.onStart(); if (!busy) web.onResume() }
+              override fun onStop() { if (!busy) web.onPause(); super.onStop() }
+
+              @Deprecated("back")
+              override fun onBackPressed() {
+                  if (!busy && showWeb) {
+                      if (web.canGoBack()) web.goBack() else { showWeb = false; loginFlow = false; render() }
+                  } else moveTaskToBack(true)
+              }
+
+              override fun onDestroy() {
+                  Hub.ui = null
+                  (web.parent as? ViewGroup)?.removeView(web)
+                  (web.context as? MutableContextWrapper)?.baseContext = Hub.app
+                  super.onDestroy()
+              }
+          }
+          EOF_UR
+          cat > app/src/main/assets/engine.js <<'EOF_UR'
+          (function(){
+          if(window.__UR)return;
+          var S=window.__UR={listUrl:null,delUrl:null,delMode:null,run:false,paused:false,removed:0,skipped:{},pending:{},waiters:{},sid:0};
+          var STRIP='count,cursor,secUid,needPinnedItemIds,post_item_list_request_type,coverFormat,video_encoding,data_collection_enabled'.split(',');
+          var STATIC='aid=1988&app_name=tiktok_web&device_platform=web_pc&coverFormat=2&needPinnedItemIds=true&post_item_list_request_type=0';
+          var DELBASE='https://www.tiktok.com/tiktok/v1/upvote/delete';
+          var MARK='"sync_delete_video":true';
+          var HDR={'content-type':'application/x-www-form-urlencoded'};
+          var jit=function(a,b){return a+Math.random()*(b-a)};
+          // Пауза идёт через нативный таймер приложения: он не замедляется, когда экран закрыт
+          var sleep=function(ms){return new Promise(function(r){
+            if(typeof Android!=='undefined'&&Android.sleep){var id=++S.sid;S.waiters[id]=r;Android.sleep(Math.round(ms),id)}else setTimeout(r,ms)})};
+          S._wake=function(id){var r=S.waiters[id];if(r){delete S.waiters[id];r()}};
+          function send(s,m){try{Android.post(JSON.stringify({s:s,removed:S.removed,skipped:Object.keys(S.skipped).length,msg:m||'',u:S.user||''}))}catch(e){}}
+          // secUid и имя аккаунта берём из данных страницы строковым поиском (JSON.parse тяжёлый) и запоминаем
+          function scan(){
+            if(S.sec)return;
+            var now=Date.now();if(now-(S.secT||0)<4000)return;S.secT=now;
+            try{var el=document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__');
+              if(el){var t=el.textContent,i=t.indexOf('"webapp.app-context"');
+                if(i>=0){var j=t.indexOf('"webapp.',i+20),sl=t.slice(i,j>0?j:i+20000),m=/"secUid":"([^"]+)"/.exec(sl),u=/"uniqueId":"([^"]+)"/.exec(sl);
+                  if(m){S.sec=m[1];if(u)S.user=u[1]}}}}catch(e){}}
+          function secUid(){
+            if(S.listUrl){try{var s=new URL(S.listUrl).searchParams.get('secUid');if(s){scan();return s}}catch(e){}}
+            scan();return S.sec||null}
+          var lastCheck='';
+          function check(){if(S.run||S.fin)return;var st=(secUid()||S.listUrl)?'ready':'idle',k=st+S.removed+(S.user||'');if(k===lastCheck)return;lastCheck=k;send(st)}
+
+          // Запоминаем подписанные запросы, которые страница делает сама (если есть)
+          try{performance.setResourceTimingBufferSize(5000)}catch(e){}
+          try{new PerformanceObserver(function(l){
+            l.getEntries().forEach(function(e){
+              if(e.name.indexOf('/api/repost/item_list')>-1)S.listUrl=e.name;
+              else if(e.name.indexOf('/tiktok/v1/upvote/delete')>-1)S.delUrl=e.name;
+            });
+            check();
+          }).observe({type:'resource',buffered:true})}catch(e){}
+
+          async function list(cur){
+            var u;
+            if(S.listUrl)u=new URL(S.listUrl);
+            else{var sc=secUid();if(!sc)return{err:'no user'};u=new URL('https://www.tiktok.com/api/repost/item_list?'+STATIC);u.searchParams.set('secUid',sc)}
+            u.searchParams.set('cursor',cur);u.searchParams.set('count','30');
+            var r=await fetch(u.toString(),{credentials:'include'});
+            if(r.status!==200)return{err:r.status};
+            var j=await r.json();
+            if(j.status_code!==undefined&&j.status_code!==0)return{err:'code '+j.status_code};
+            return{items:(j.itemList||[]).map(function(x){return x.id}),cursor:String(j.cursor||'0'),more:!!j.hasMore};
+          }
+          // Варианты запроса удаления: 0 — прямой (5 параметров), 1 — по подписанному запросу списка, 2 — по запросу страницы
+          function delUrls(id){
+            var o=[],d=new URL(DELBASE+'?aid=1988&app_name=tiktok_web&device_platform=web_pc');
+            d.searchParams.set('item_id',id);d.searchParams.set('action_type','1');o.push(d.toString());
+            if(S.listUrl){var b=new URL(S.listUrl),u=new URL(DELBASE);
+              b.searchParams.forEach(function(v,k){if(STRIP.indexOf(k)<0)u.searchParams.set(k,v)});
+              u.searchParams.set('item_id',id);u.searchParams.set('action_type','1');o.push(u.toString())}
+            else o.push(null);
+            if(S.delUrl){var e=new URL(S.delUrl);e.searchParams.set('item_id',id);o.push(e.toString())}
+            else o.push(null);
+            return o}
+          async function del(id){
+            var urls=delUrls(id),modes=S.delMode!=null?[S.delMode]:[0,1,2];
+            for(var k=0;k<modes.length;k++){
+              var u=urls[modes[k]];if(!u)continue;
+              var r=await fetch(u,{method:'POST',credentials:'include',headers:HDR});
+              if(r.status===429)return'rate';
+              var t='';try{t=await r.text()}catch(e){}
+              var j=null;try{j=JSON.parse(t)}catch(e){}
+              if(r.status===200&&(t.indexOf(MARK)>-1||(j&&j.status_code===0))){S.delMode=modes[k];return'ok'}
+            }
+            return'fail';
+          }
+          async function gate(){while(S.paused&&S.run)await sleep(400)}
+          var safeDel=function(id){return del(id).catch(function(){return'fail'})};
+
+          S.pause=function(){S.paused=true;send('paused')};
+          S.resume=function(){S.paused=false;send('running')};
+          S.stop=function(){S.stopped=true;S.run=false;S.paused=false;Object.keys(S.waiters).forEach(function(id){S._wake(id)})};
+          S.start=async function(){
+            if(S.run||!(S.listUrl||secUid()))return;
+            S.run=true;S.paused=false;
+            var cur='0',empty=0,back=20000,bad=0,n=0,first=true;
+            send('running');
+            try{document.querySelectorAll('video').forEach(function(v){v.pause();v.muted=true})}catch(e){}
+            while(S.run){
+              await gate();
+              var p;try{p=await list(cur)}catch(e){p={err:String(e)}}
+              if(p.err){
+                if(++bad>8){S.run=false;S.fin=true;send('error','TikTok не отвечает или сессия истекла. Войдите снова.');return}
+                send('running','Ограничение TikTok, жду '+Math.round(back/1000)+' с');
+                await sleep(back);back=Math.min(back*2,300000);continue;
+              }
+              bad=0;back=20000;
+              if(first&&!p.items.length&&!S.listUrl){
+                // пустой ответ без подписанного запроса — это не «репостов нет», а отказ TikTok
+                S.run=false;send('idle','TikTok не отдал список. Откройте профиль → «Репосты», затем нажмите «Старт».');return}
+              first=false;
+              p.items.forEach(function(id){if(S.pending[id]){S.skipped[id]=1;S.removed--}});
+              S.pending={};
+              var fresh=p.items.filter(function(id){return!S.skipped[id]});
+              if(!fresh.length){
+                if(p.more&&p.items.length){cur=p.cursor;continue}
+                if(++empty>=3)break;
+                await sleep(4000);cur='0';continue;
+              }
+              empty=0;
+              for(var i=0;i<fresh.length&&S.run;i++){
+                await gate();
+                var id=fresh[i],res=await safeDel(id),t=0;
+                while(res!=='ok'&&t<2&&S.run){await sleep(res==='rate'?60000:jit(2000,4000));res=await safeDel(id);t++}
+                if(res==='ok'){
+                  S.removed++;S.pending[id]=1;
+                  if(++n%25===0){send('running','Короткая пауза…');await sleep(jit(8000,15000))}else send('running');
+                }else if(res==='rate'){
+                  send('running','Лимит TikTok, жду…');await sleep(back);back=Math.min(back*2,300000);break;
+                }else S.skipped[id]=1;
+                await sleep(jit(700,1600));
+              }
+              if(S.run)await sleep(2500);cur='0';
+            }
+            var stopped=S.stopped;S.run=false;
+            if(stopped){S.stopped=false;send('idle','Остановлено. Удалено: '+S.removed);return}
+            S.fin=true;send('done');
+          };
+
+          // ---- Удаление одного репоста из открытого видео ----
+          function toast(t){
+            if(typeof document==='undefined'||!document.body)return;
+            var e=document.getElementById('ur-toast');
+            if(!e){e=document.createElement('div');e.id='ur-toast';
+              e.style.cssText='position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:2147483647;background:#222;color:#fff;font:14px sans-serif;padding:10px 16px;border-radius:12px';
+              document.body.appendChild(e)}
+            e.textContent=t;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(function(){e.style.display='none'},2800)}
+          S.delOne=async function(id){
+            toast('Удаляю репост…');
+            var r=await safeDel(id);
+            if(r==='ok'){S.removed++;toast('Репост удалён ✓');if(S.run)send('running');else check()}
+            else toast(r==='rate'?'Лимит TikTok, подождите минуту':'Не получилось: возможно, это не ваш репост');
+          };
+          function vid(){var m=location.pathname.match(/\/video\/(\d+)/);return m&&m[1]}
+          function addFab(){
+            if(document.getElementById('ur-fab')||!document.body)return;
+            var fab=document.createElement('div');fab.id='ur-fab';fab.textContent='Удалить репост';
+            fab.style.cssText='position:fixed;right:12px;bottom:96px;z-index:2147483647;background:#fe2c55;color:#fff;font:600 14px sans-serif;padding:10px 14px;border-radius:22px;box-shadow:0 2px 10px rgba(0,0,0,.5)';
+            fab.addEventListener('click',function(){var v=vid();if(v)S.delOne(v)});document.body.appendChild(fab)}
+          // пункт «Удалить репост» в меню (скорость, качество, …, пожаловаться)
+          function injectMenu(){
+            var rep=document.evaluate("//*[not(*)][normalize-space(.)='Пожаловаться' or normalize-space(.)='Report']",document,null,9,null).singleNodeValue;
+            if(!rep)return;
+            var menu=rep;while(menu.parentElement&&!/Скорость|Speed/.test(menu.textContent||''))menu=menu.parentElement;
+            if(!/Скорость|Speed/.test(menu.textContent||''))return;
+            var row=rep;while(row.parentElement&&row.parentElement!==menu&&row.offsetWidth<menu.offsetWidth*0.85)row=row.parentElement;
+            if(!row.parentElement||row.parentElement.querySelector('[data-ur]'))return;
+            var it=row.cloneNode(true);it.setAttribute('data-ur','1');
+            var w=document.createTreeWalker(it,NodeFilter.SHOW_TEXT),nd;
+            while((nd=w.nextNode()))if(/Пожаловаться|Report/.test(nd.nodeValue))nd.nodeValue='Удалить репост';
+            it.style.color='#fe2c55';it.style.cursor='pointer';
+            it.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();var v=vid();if(v)S.delOne(v)},true);
+            row.parentElement.insertBefore(it,row)}
+          var obs=null,lastHref='';
+          function onMut(muts){
+            if(!vid())return;
+            for(var i=0;i<muts.length;i++){var a=muts[i].addedNodes;
+              for(var k=0;k<a.length;k++){var n=a[k];
+                if(n.nodeType===1&&n.childElementCount<80&&/Пожаловаться|Report/.test(n.textContent||'')){clearTimeout(S._t);S._t=setTimeout(injectMenu,120);return}}}}
+          function route(){
+            if(location.href===lastHref)return;lastHref=location.href;
+            var f=document.getElementById('ur-fab');
+            if(vid()){addFab();if(!obs&&document.body){obs=new MutationObserver(onMut);obs.observe(document.body,{childList:true,subtree:true})}}
+            else{if(f)f.remove();if(obs){obs.disconnect();obs=null}}}
+          if(typeof document!=='undefined'&&document.body&&typeof MutationObserver!=='undefined'){route();setInterval(route,1000)}
+          check();
+          })();
+          EOF_UR
+          base64 -d app/debug.keystore.b64 > app/debug.keystore
       - name: Build APK
-        working-directory: src/UnRepost
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleRelease --no-daemon
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
           name: UnRepost build ${{ github.run_number }}
-          files: src/UnRepost/app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: UnRepost-apk
-          path: src/UnRepost/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk
